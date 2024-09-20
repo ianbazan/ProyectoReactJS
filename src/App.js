@@ -14,7 +14,7 @@ import './index.css';
 
 function App() {
   const API_URL = 'https://api.themoviedb.org/3/';
-  const API_KEY = '2bd4cead62c3c6f2bfcfd7e8997bc617';
+  const API_KEY = '8a8dee24072130d201f879d11f5b023c';
   const IMAGE_PATH = 'https://image.tmdb.org/t/p/original';
 
   const [movies, setMovies] = useState([]);
