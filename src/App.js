@@ -148,7 +148,7 @@ function App() {
     fetchGenres();
     fetchPopularMovies();
     fetchTopRatedMovies();
-  }, []);
+  }, [fetchMovies, fetchGenres, fetchPopularMovies, fetchTopRatedMovies]);
 
   return (
     <div className="bg-gray-900 min-h-screen text-white p-6">
