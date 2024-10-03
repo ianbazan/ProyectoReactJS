@@ -1,9 +1,8 @@
 // src/App.js
-import React, { useEffect, useState, useContext } from 'react';
-import axios from 'axios';
-import { FaSearch } from 'react-icons/fa';
-import { FaArrowUp } from 'react-icons/fa';
+import React, { useEffect, useState, useContext, useCallback } from 'react';
+import { FaSearch, FaArrowUp } from 'react-icons/fa';
 import { Routes, Route, Link } from 'react-router-dom';
+import useSWR from 'swr'; // Importar SWR
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -12,21 +11,38 @@ import { UserContext } from './context/UserContext';
 import './App.css';
 import './index.css';
 
-function App() {
-  const API_URL = 'https://api.themoviedb.org/3/';
-  const API_KEY = '8a8dee24072130d201f879d11f5b023c';
-  const IMAGE_PATH = 'https://image.tmdb.org/t/p/original';
+const API_URL = 'https://api.themoviedb.org/3/';
+const API_KEY = '8a8dee24072130d201f879d11f5b023c';
+const IMAGE_PATH = 'https://image.tmdb.org/t/p/original';
 
-  const [movies, setMovies] = useState([]);
+// Función fetcher para usar en SWR
+const fetcher = (url) => fetch(url).then(res => res.json());
+
+function App() {
   const [searchKey, setSearchKey] = useState("");
-  const [trailer, setTrailer] = useState(null);
   const [movie, setMovie] = useState({ title: "Loading Movies" });
   const [playing, setPlaying] = useState(false);
-  const [genres, setGenres] = useState([]);
-  const [topRatedMovies, setTopRatedMovies] = useState([]);
-  const [popularMovies, setPopularMovies] = useState([]);
+  const [trailer, setTrailer] = useState(null);
 
   const { user, logout } = useContext(UserContext);
+
+  // Fetch de películas por búsqueda (SWR)
+  const { data: movies, error: movieError, isLoading: movieLoading } = useSWR(
+    searchKey ? `${API_URL}search/movie?api_key=${API_KEY}&query=${searchKey}` : `${API_URL}discover/movie?api_key=${API_KEY}`, 
+    fetcher
+  );
+
+  // Fetch de géneros (SWR)
+  const { data: genreData } = useSWR(`${API_URL}genre/movie/list?api_key=${API_KEY}`, fetcher);
+  const genres = genreData?.genres || [];
+
+  // Fetch de películas populares (SWR)
+  const { data: popularData } = useSWR(`${API_URL}movie/popular?api_key=${API_KEY}`, fetcher);
+  const popularMovies = popularData?.results || [];
+
+  // Fetch de películas mejor rankeadas (SWR)
+  const { data: topRatedData } = useSWR(`${API_URL}movie/top_rated?api_key=${API_KEY}`, fetcher);
+  const topRatedMovies = topRatedData?.results || [];
 
   // Scroll hacia arriba 
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -53,34 +69,17 @@ function App() {
     });
   };
 
-
-  // Fetch de películas basadas en búsqueda
-  const fetchMovies = async (searchKey) => {
-    const type = searchKey ? "search" : "discover";
-    const { data: { results } } = await axios.get(`${API_URL}/${type}/movie`, {
-      params: {
-        api_key: API_KEY,
-        query: searchKey,
-      },
-    });
-
-    setMovies(results);
-    setMovie(results[0]);
-
-    if (results.length) {
-      await fetchMovie(results[0].id);
-    }
+  // Selección de película
+  const selectMovie = (selectedMovie) => {
+    fetchMovieDetails(selectedMovie.id);
+    setMovie(selectedMovie);
+    window.scrollTo(0, 0);
   };
 
   // Fetch de detalles de una película específica
-  const fetchMovie = async (id) => {
-    const { data } = await axios.get(`${API_URL}/movie/${id}`, {
-      params: {
-        api_key: API_KEY,
-        append_to_response: "videos"
-      }
-    });
-
+  const fetchMovieDetails = useCallback(async (id) => {
+    const url = `${API_URL}movie/${id}?api_key=${API_KEY}&append_to_response=videos`;
+    const data = await fetcher(url);
     if (data.videos && data.videos.results) {
       const trailer = data.videos.results.find(
         (vid) => vid.name === "Official Trailer"
@@ -88,67 +87,15 @@ function App() {
       setTrailer(trailer ? trailer : data.videos.results[0]);
     }
     setMovie(data);
-  };
+  }, []);
 
-  // Fetch de géneros de películas
-  const fetchGenres = async () => {
-    const { data: { genres } } = await axios.get(`${API_URL}/genre/movie/list`, {
-      params: {
-        api_key: API_KEY,
-      },
-    });
-    setGenres(genres);
-  };
-
-  // Fetch de películas por género
-  const fetchMoviesByGenre = async (genreId) => {
-    const { data: { results } } = await axios.get(`${API_URL}/discover/movie`, {
-      params: {
-        api_key: API_KEY,
-        with_genres: genreId,
-      },
-    });
-    setMovies(results);
-    setMovie(results[0]);
-  };
-
-  // Fetch de películas populares
-  const fetchPopularMovies = async () => {
-    const { data: { results } } = await axios.get(`${API_URL}/movie/popular`, {
-      params: {
-        api_key: API_KEY,
-      },
-    });
-    setPopularMovies(results);
-  };
-
-  // Fetch de películas mejor rankeadas
-  const fetchTopRatedMovies = async () => {
-    const { data: { results } } = await axios.get(`${API_URL}/movie/top_rated`, {
-      params: {
-        api_key: API_KEY,
-      },
-    });
-    setTopRatedMovies(results);
-  };
-
-  const selectMovie = async (movie) => {
-    fetchMovie(movie.id);
-    setMovie(movie);
-    window.scrollTo(0, 0);
-  };
-
+  // Búsqueda de películas
   const searchMovies = (e) => {
     e.preventDefault();
-    fetchMovies(searchKey);
   };
 
-  useEffect(() => {
-    fetchMovies();
-    fetchGenres();
-    fetchPopularMovies();
-    fetchTopRatedMovies();
-  }, [fetchMovies, fetchGenres, fetchPopularMovies, fetchTopRatedMovies]);
+  if (movieLoading) return <div>Loading movies...</div>;
+  if (movieError) return <div>Error loading movies</div>;
 
   return (
     <div className="bg-gray-900 min-h-screen text-white p-6">
@@ -194,7 +141,7 @@ function App() {
         <Route path="/" element={
           <Home
             selectMovie={selectMovie}
-            movies={movies}
+            movies={movies?.results || []}
             trailer={trailer}
             playing={playing}
             setPlaying={setPlaying}
@@ -202,9 +149,6 @@ function App() {
             IMAGE_PATH={IMAGE_PATH}
             popularMovies={popularMovies}
             topRatedMovies={topRatedMovies}
-            fetchPopularMovies={fetchPopularMovies}
-            fetchTopRatedMovies={fetchTopRatedMovies}
-            fetchMoviesByGenre={fetchMoviesByGenre}
             genres={genres} // Pasando géneros a Home
           />
         } />
@@ -214,10 +158,10 @@ function App() {
       </Routes>
       {showScrollButton && (
         <button
-        className="scroll-to-top-button fixed bottom-10 right-10 p-3 bg-gray-800 rounded-full hover:bg-gray-700 focus:outline-none"
-        onClick={scrollToTop}
+          className="scroll-to-top-button fixed bottom-10 right-10 p-3 bg-gray-800 rounded-full hover:bg-gray-700 focus:outline-none"
+          onClick={scrollToTop}
         >
-        <FaArrowUp className="text-white"/>
+          <FaArrowUp className="text-white"/>
         </button>
       )}
     </div>

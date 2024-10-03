@@ -17,30 +17,40 @@ const Home = ({ selectMovie, movies, trailer, playing, setPlaying, movie, IMAGE_
   }, [movies]);
 
   const fetchMoviesByCategory = async (categoryId) => {
-    const response = await fetch(`https://api.themoviedb.org/3/discover/movie?with_genres=${categoryId}`, {
-      method: 'GET',
-      headers: {
-        accept: 'application/json',
-        Authorization: 'Bearer 2bd4cead62c3c6f2bfcfd7e8997bc617'
-      }
-    });
-    const data = await response.json();
-    setFilteredMovies(data.results);
-  };
+    try {
+        const response = await fetch(`https://api.themoviedb.org/3/discover/movie?with_genres=${categoryId}`, {
+            method: 'GET',
+            headers: {
+                accept: 'application/json',
+                Authorization: 'Bearer 2bd4cead62c3c6f2bfcfd7e8997bc617'
+                
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Error fetching movies by category: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setFilteredMovies(data.results);
+    } catch (error) {
+        console.error("Error fetching movies:", error);
+    }
+};
 
   return (
     <div className='flex'>
       <Sidebar
-        selectCategory={fetchMoviesByGenre}
-        fetchPopularMovies={() => {
-          fetchPopularMovies();
-          popularMoviesRef.current.scrollIntoView({ behavior: 'smooth' });
-        }}
-        fetchTopRatedMovies={() => {
-          fetchTopRatedMovies();
-          topRatedMoviesRef.current.scrollIntoView({ behavior: 'smooth' });
-        }}
-        genres={genres}
+          selectCategory={fetchMoviesByCategory} // Aquí llamas a fetchMoviesByCategory
+          fetchPopularMovies={() => {
+              fetchPopularMovies();
+              popularMoviesRef.current.scrollIntoView({ behavior: 'smooth' });
+          }}
+          fetchTopRatedMovies={() => {
+              fetchTopRatedMovies();
+              topRatedMoviesRef.current.scrollIntoView({ behavior: 'smooth' });
+          }}
+          genres={genres}
       />
       <div className='flex-grow p-5'>
         <main>
